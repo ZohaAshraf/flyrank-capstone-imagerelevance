@@ -3,5 +3,5 @@
 # pydantic
 # sqlalchemy
 # psycopg2-binary
-# google-generativeai
-# python-dotenv
+ google-generativeai
+ python-dotenv
