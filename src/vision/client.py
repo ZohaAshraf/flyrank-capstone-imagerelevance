@@ -9,7 +9,7 @@ silently accepted (per DESIGN.md).
 
 import os
 
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
@@ -17,7 +17,7 @@ from src.vision.schema import ImageMetadata
 
 load_dotenv()
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
 _PROMPT = """
 Look at this image and respond with ONLY a JSON object (no markdown, no
@@ -41,13 +41,14 @@ def classify_image(image_path: str) -> ImageMetadata:
     the required schema — callers must catch this and flag/retry rather
     than trust the raw output.
     """
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    uploaded_file = _client.files.upload(file=image_path)
 
-    uploaded_file = genai.upload_file(image_path)
-    response = model.generate_content([uploaded_file, _PROMPT])
+    response = _client.models.generate_content(
+        model="gemini-flash-latest",
+        contents=[uploaded_file, _PROMPT],
+    )
 
     raw_text = response.text.strip()
-    # Strip markdown code fences if the model added them anyway
     if raw_text.startswith("```"):
         raw_text = raw_text.strip("`")
         raw_text = raw_text.replace("json\n", "", 1)
