@@ -41,12 +41,14 @@ def match_post_to_image(post_id: str) -> Suggestion:
         top_image_id, top_score = ranked[0]
         top_image = session.get(Image, top_image_id)
 
+        
         decision = evaluate(
-            image_category=top_image.category,
-            expected_category=post.expected_category,
-            similarity_score=top_score,
-            image_confidence=top_image.confidence,
-        )
+    image_subject=top_image.subject,
+    image_category=top_image.category,
+    expected_subject=post.expected_category,  # reused field, now holds a subject keyword like "fox"
+    similarity_score=top_score,
+    image_confidence=top_image.confidence,
+)
 
         suggestion = Suggestion(
             post_id=post.id,

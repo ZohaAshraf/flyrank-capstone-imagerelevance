@@ -1,13 +1,13 @@
 """
 The mismatch guard — decides whether the top-ranked image is actually a
 good enough match, or should be rejected/marked "no confident match".
-Combines category match, similarity threshold, and confidence floor,
-per DESIGN.md.
+Combines subject/category match, similarity threshold, and confidence
+floor, per DESIGN.md.
 """
 
 from dataclasses import dataclass
 
-SIMILARITY_THRESHOLD = 0.70
+SIMILARITY_THRESHOLD = 0.65
 CONFIDENCE_FLOOR = 0.60
 
 
@@ -18,19 +18,16 @@ class GuardDecision:
 
 
 def evaluate(
+    image_subject: str,
     image_category: str,
-    expected_category: str | None,
+    expected_subject: str | None,
     similarity_score: float,
     image_confidence: float,
 ) -> GuardDecision:
-    """
-    Runs the three checks in order and returns the first failure reason,
-    or an acceptance if all three pass.
-    """
-    if expected_category and image_category != expected_category:
+    if expected_subject and expected_subject.lower() not in image_subject.lower():
         return GuardDecision(
             accepted=False,
-            reason=f"Category mismatch: expected '{expected_category}', detected '{image_category}'",
+            reason=f"Subject mismatch: expected '{expected_subject}', detected '{image_subject}'",
         )
 
     if similarity_score < SIMILARITY_THRESHOLD:
