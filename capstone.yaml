@@ -1,10 +1,4 @@
-# Manifest the evaluator reads. Fill each field in as the corresponding
-# piece becomes real — leave blank until then, don't guess ahead.
-
-run: ""       # e.g. "uvicorn src.api.main:app --reload"
-seed: ""      # e.g. "python -m src.db.seed"
-test: ""      # optional, e.g. "pytest"
-base_url: ""  # e.g. "http://localhost:8000"
-
-endpoints: []
-  # - GET /posts/:id/images
+run: "uvicorn src.api.main:app --reload"
+seed: "python seed_eval_set.py"
+test: "pytest tests/ -v"
+base_url: "http://127.0.0.1:8000"
