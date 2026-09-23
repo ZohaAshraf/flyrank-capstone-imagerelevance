@@ -1,0 +1,8 @@
+# Core dependencies — versions to be pinned as each is actually added/used.
+# fastapi
+# uvicorn
+# pydantic
+# sqlalchemy
+# psycopg2-binary
+# google-generativeai
+# python-dotenv
