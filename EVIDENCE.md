@@ -27,3 +27,22 @@ not done.
 ## Quality & documentation
 - [ ] Labeled eval dataset measures top-1 precision (number in README)
 - [ ] README has architecture explanation + diagram; required files present
+## Vision processing
+- Vision model produces structured output validated against schema: see `src/vision/schema.py`, `tests/test_schema.py` (4/4 tests pass)
+- Batch job with retries: `src/vision/batch.py`, run via `python -m src.vision.batch`, both fox_01.jpg and wolf_01.jpg tagged successfully
+
+## Matching system
+- Semantic matching works: fox post matched fox image with similarity 0.69
+- Command: `python test_match_manual.py`
+- Output:
+Guard result: accepted
+Reason: Passed all checks
+Image ID: 3726be41-2946-4160-bf87-70b7d87b0b02
+Similarity score: 0.6905698244106772
+
+## Safety layer (mismatch guard)
+- Guard rejects wolf-as-fox scenario with explanation (Probe 3)
+- Command: `python test_guard_reject.py`
+- Output:
+Accepted: False
+Reason: Subject mismatch: expected 'fox', detected 'gray wolf'
