@@ -1,12 +1,14 @@
 """
 Batch processing for image classification.
 
-Runs classify_image() over a folder of images with retries and per-call
-cost tracking, saving results to the database. Per DESIGN.md and the
-brief's requirement that vision calls run as background batch jobs with
+Runs classify_image() over a folder of images with retries, per-call
+cost tracking, and a delay between calls to respect the free-tier rate
+limit. Saves results to the database. Per DESIGN.md and the brief's
+requirement that vision calls run as background batch jobs with
 retries, never blocking a single request.
 """
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,6 +20,7 @@ from src.db.session import SessionLocal, init_db
 from src.db.models import Image
 
 COST_PER_CALL_USD = 0.0
+DELAY_BETWEEN_CALLS_SEC = 4  # stay under free-tier rate limits
 
 
 @dataclass
@@ -29,7 +32,7 @@ class BatchResult:
     cost_usd: float
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=2, min=4, max=30))
 def _classify_with_retry(image_path: str) -> ImageMetadata:
     return classify_image(image_path)
 
@@ -63,8 +66,12 @@ def run_batch(image_dir: str) -> list[BatchResult]:
             session.commit()
             print(f"[OK] {path.name} -> {metadata.subject} (confidence={metadata.confidence})")
         except Exception as e:
-            results.append(BatchResult(str(path), None, False, str(e), 0.0))
-            print(f"[FAILED after retries] {path.name} -> {e}")
+            # Unwrap the real cause if it's a RetryError wrapping something else
+            root_cause = e.__cause__ if e.__cause__ else e
+            results.append(BatchResult(str(path), None, False, str(root_cause), 0.0))
+            print(f"[FAILED after retries] {path.name} -> {root_cause}")
+
+        time.sleep(DELAY_BETWEEN_CALLS_SEC)
 
     session.close()
     return results
