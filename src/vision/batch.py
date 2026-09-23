@@ -2,22 +2,21 @@
 Batch processing for image classification.
 
 Runs classify_image() over a folder of images with retries and per-call
-cost tracking, instead of one-off single calls. Per DESIGN.md and the
+cost tracking, saving results to the database. Per DESIGN.md and the
 brief's requirement that vision calls run as background batch jobs with
 retries, never blocking a single request.
 """
 
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.vision.client import classify_image
 from src.vision.schema import ImageMetadata
+from src.db.session import SessionLocal, init_db
+from src.db.models import Image
 
-# Gemini Flash free-tier approximate cost per image (placeholder — refine
-# once real usage/pricing is confirmed via Google AI Studio dashboard).
 COST_PER_CALL_USD = 0.0
 
 
@@ -32,16 +31,12 @@ class BatchResult:
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def _classify_with_retry(image_path: str) -> ImageMetadata:
-    """Wraps classify_image with retry-with-backoff: 3 attempts, exponential wait."""
     return classify_image(image_path)
 
 
 def run_batch(image_dir: str) -> list[BatchResult]:
-    """
-    Classify every image in image_dir. Never raises on a single failure —
-    each image's outcome (success or error) is captured in its own
-    BatchResult so one bad image doesn't stop the whole batch.
-    """
+    init_db()
+    session = SessionLocal()
     results: list[BatchResult] = []
     image_paths = sorted(
         p for p in Path(image_dir).iterdir()
@@ -52,27 +47,26 @@ def run_batch(image_dir: str) -> list[BatchResult]:
         try:
             metadata = _classify_with_retry(str(path))
             results.append(
-                BatchResult(
-                    file_path=str(path),
-                    metadata=metadata,
-                    success=True,
-                    error=None,
-                    cost_usd=COST_PER_CALL_USD,
-                )
+                BatchResult(str(path), metadata, True, None, COST_PER_CALL_USD)
             )
+            db_image = Image(
+                file_path=str(path),
+                subject=metadata.subject,
+                category=metadata.category,
+                attributes=metadata.attributes,
+                caption=metadata.caption,
+                confidence=metadata.confidence,
+                flagged=metadata.is_low_confidence,
+                cost_usd=COST_PER_CALL_USD,
+            )
+            session.add(db_image)
+            session.commit()
             print(f"[OK] {path.name} -> {metadata.subject} (confidence={metadata.confidence})")
         except Exception as e:
-            results.append(
-                BatchResult(
-                    file_path=str(path),
-                    metadata=None,
-                    success=False,
-                    error=str(e),
-                    cost_usd=0.0,
-                )
-            )
+            results.append(BatchResult(str(path), None, False, str(e), 0.0))
             print(f"[FAILED after retries] {path.name} -> {e}")
 
+    session.close()
     return results
 
 
